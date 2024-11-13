@@ -143,6 +143,7 @@ def handle_user_input(message):
             bot.reply_to(message, f"Чат {chat_id} привязан к пользователю {user_id}.")
         else:
             bot.reply_to(message, "Нет чатов, ожидающих привязки.")
+            return
     else:
         bot.reply_to(message, "Введите ID пользователя.")
 
