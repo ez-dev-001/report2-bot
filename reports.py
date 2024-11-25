@@ -9,7 +9,7 @@ from telebot import types
 
 bot = telebot.TeleBot(config.TOKEN)
 
-YOUR_ADMIN_ID = [1409326380,740112531]  # Ваш админ ID
+YOUR_ADMIN_ID = []  # Ваш админ ID
 
 # Функция загрузки данных из JSON-файла
 def load_config():
@@ -46,11 +46,6 @@ def send_scheduled_messages():
         current_time = datetime.utcnow() + timedelta(hours=1)
         current_hour = current_time.hour
         current_minute = current_time.minute
-
-        if current_hour == 23 and current_minute == 59:
-            print("Время 23:59 по GMT+1. Остановка бота.")
-            bot.stop_polling()
-            return
 
         if (start_hour <= current_hour <= end_hour and current_minute == minute_of_hour) or (current_hour == end_hour and current_minute == final_minute):
             for chat_id in ALLOWED_CHAT_ID:
@@ -214,9 +209,28 @@ def handle_keep_callback(call):
     print(f"Сообщение под номером {number} оставлено без изменений в чате {chat_id}.")
     bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
 
-# Запуск потока для периодической отправки сообщений по расписанию
-schedule_thread = threading.Thread(target=send_scheduled_messages, daemon=True)
-schedule_thread.start()
+# Глобальная переменная для потока
+schedule_thread = None
+schedule_thread_lock = threading.Lock()
 
-# Запуск бота
-bot.polling(none_stop=True)
+def start_schedule_thread():
+    global schedule_thread
+
+    # Используем блокировку для безопасного изменения состояния
+    with schedule_thread_lock:
+        if schedule_thread and schedule_thread.is_alive():
+            print("Поток send_scheduled_messages уже запущен.")
+        else:
+            schedule_thread = threading.Thread(target=send_scheduled_messages, daemon=True)
+            schedule_thread.start()
+            print("Поток send_scheduled_messages запущен.")
+
+# Перезапуск бота с проверкой потока
+while True:
+    try:
+        print("Запуск бота...")
+        start_schedule_thread()  # Гарантированно запускает поток, если он не активен
+        bot.polling(none_stop=True)
+    except Exception as e:
+        print(f"Ошибка в bot.polling: {e}. Перезапуск через 5 секунд...")
+        time.sleep(5)
